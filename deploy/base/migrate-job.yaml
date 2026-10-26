@@ -1,0 +1,36 @@
+# Runs "alembic upgrade head" ONCE per deploy, before the new API starts.
+# Why a Job and not "run it inside the API on startup":
+# with 3 API replicas, all 3 would try to migrate at the same time and clash.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrate
+  annotations:
+    # Argo CD runs this BEFORE syncing the other resources (PreSync),
+    # and deletes the old Job first so a new one can run every deploy.
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 4                 # Postgres may still be starting; retry a few times
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      # Wait until Postgres answers before trying to migrate.
+      initContainers:
+        - name: wait-for-postgres
+          image: pgvector/pgvector:pg16
+          command: ["sh", "-c", "until pg_isready -h postgres -p 5432; do sleep 2; done"]
+      containers:
+        - name: migrate
+          image: incidentlens-backend       # tag is filled in by kustomize "images:"
+          workingDir: /srv                  # where alembic.ini lives in the image
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - secretRef: { name: incidentlens-secrets }
+            - configMapRef: { name: incidentlens-config }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }

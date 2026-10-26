@@ -1,0 +1,64 @@
+# Postgres WITH the pgvector extension (the plain postgres image does not have it,
+# which is the error you hit with "extension vector is not available").
+# StatefulSet (not Deployment) because a database needs a stable identity and its own disk.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  serviceName: postgres          # must match the headless Service below
+  replicas: 1                    # one database; HA would need an operator, out of scope
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: incidentlens
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: incidentlens-secrets, key: POSTGRES_PASSWORD }
+            # Postgres refuses to start if the data dir is the mount root, so use a subfolder.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          # "Ready" only when Postgres really accepts connections,
+          # so the migration Job and the API do not start too early.
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "postgres", "-d", "incidentlens"] }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+  # Each pod gets its own disk that survives restarts.
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
+---
+# "Headless" (clusterIP: None) = no load balancer; gives postgres-0 a stable DNS name.
+# Apps connect with the plain name "postgres".
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  clusterIP: None
+  selector: { app: postgres }
+  ports:
+    - port: 5432
+      targetPort: 5432

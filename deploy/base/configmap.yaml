@@ -1,0 +1,18 @@
+# Non-secret settings. Anything sensitive lives in the "incidentlens-secrets" Secret instead.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: incidentlens-config
+data:
+  # Redis is the Celery broker (cheaper than RabbitMQ for this app).
+  BROKER_URL: "redis://redis:6379/0"
+
+  # The collectors read the monitoring stack that runs in the cluster.
+  # These are in-cluster DNS names, so no port-forward is needed here (unlike on your laptop).
+  PROMETHEUS_URL: "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+  LOKI_URL: "http://loki-gateway.monitoring.svc.cluster.local"
+  LOKI_SERVICE_LABEL: "app"
+
+  GITHUB_DEPLOY_REPO: "Pankaj-karpe/atomic-tickets-manifests"
+  ALGORITHM: "HS256"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "60"

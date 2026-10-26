@@ -1,0 +1,53 @@
+# The Celery worker: collects metrics/logs, calls the LLM, saves the result.
+# Same image as the API, only the command differs.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: incidentlens-worker
+spec:
+  replicas: 1                    # Part 5 will autoscale this on queue depth
+  selector:
+    matchLabels: { app: incidentlens-worker }
+  template:
+    metadata:
+      labels: { app: incidentlens-worker }
+    spec:
+      containers:
+        - name: worker
+          image: incidentlens-backend
+          # Linux pool (prefork) works here; "--pool=solo" was only a Windows workaround.
+          # "-Q incidentlens" = the queue name set in celeryapp.py. Without it, nothing is consumed.
+          command:
+            - celery
+            - -A
+            - app.workers.celeryapp
+            - worker
+            - --loglevel=info
+            - -Q
+            - incidentlens
+            - --concurrency=2
+          envFrom:
+            - secretRef: { name: incidentlens-secrets }
+            - configMapRef: { name: incidentlens-config }
+          # Is the worker alive and connected to the broker? Celery can answer a "ping".
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "celery -A app.workers.celeryapp inspect ping -d celery@$HOSTNAME"]
+            initialDelaySeconds: 30
+            periodSeconds: 60
+            timeoutSeconds: 15
+          resources:
+            requests: { cpu: 100m, memory: 192Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

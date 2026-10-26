@@ -1,0 +1,24 @@
+# Two hostnames instead of path rewriting.
+# In project 2 a single Ingress with a rewrite rule broke the frontend's CSS/JS files.
+# Separate hosts avoid that whole class of bug.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: incidentlens
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: incidentlens.local            # the web UI
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: incidentlens-frontend, port: { number: 80 } }
+    - host: api.incidentlens.local        # the API + the Alertmanager webhook
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: incidentlens-api, port: { number: 8000 } }

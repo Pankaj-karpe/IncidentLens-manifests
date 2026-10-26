@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: incidentlens-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: incidentlens-frontend }
+  template:
+    metadata:
+      labels: { app: incidentlens-frontend }
+    spec:
+      containers:
+        - name: frontend
+          image: incidentlens-frontend
+          # Next.js "standalone" build listens on 3000.
+          ports:
+            - name: http
+              containerPort: 3000
+          readinessProbe:
+            httpGet: { path: /login, port: http }
+            initialDelaySeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 96Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: incidentlens-frontend
+spec:
+  selector: { app: incidentlens-frontend }
+  ports:
+    - port: 80
+      targetPort: http

@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: incidentlens-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: incidentlens-api }
+  template:
+    metadata:
+      labels: { app: incidentlens-api }
+    spec:
+      containers:
+        - name: api
+          image: incidentlens-backend
+          # CMD in the Dockerfile already starts uvicorn on port 8000.
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - secretRef: { name: incidentlens-secrets }
+            - configMapRef: { name: incidentlens-config }
+          # Two different questions:
+          #  - readiness: "can I take traffic?"  -> checks the database (/readyz)
+          #  - liveness:  "is the process stuck?" -> must NOT depend on the database,
+          #    otherwise a DB outage would restart every API pod for no benefit.
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 100m, memory: 192Mi }
+            limits: { memory: 384Mi }
+          # The container cannot become root or write to its own disk.
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp          # Python sometimes needs a writable /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: incidentlens-api
+  labels:
+    app: incidentlens-api      # the ServiceMonitor in Part 4 matches on this label
+spec:
+  selector: { app: incidentlens-api }
+  ports:
+    - name: http               # named port: needed by the ServiceMonitor later
+      port: 8000
+      targetPort: http

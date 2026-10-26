@@ -1,0 +1,16 @@
+# Dev = the base plus small differences. Prod gets its own copy later (more replicas, other tag).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: incidentlens-dev     # puts every resource in this namespace
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+# Dev runs lean to fit minikube's memory.
+replicas:
+  - name: incidentlens-api
+    count: 1
+  - name: incidentlens-frontend
+    count: 1

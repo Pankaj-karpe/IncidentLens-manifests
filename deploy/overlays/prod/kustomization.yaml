@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: incidentlens-prod
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+replicas:
+  - name: incidentlens-api
+    count: 3
+  - name: incidentlens-frontend
+    count: 2
+  - name: incidentlens-worker
+    count: 2
+
+# Prod pins an exact, tested tag. CI promotes a tag here only after dev works.
+images:
+  - name: incidentlens-backend
+    newName: pankajkarpe1/incidentlens-backend
+    newTag: v1
+  - name: incidentlens-frontend
+    newName: pankajkarpe1/incidentlens-frontend
+    newTag: v2

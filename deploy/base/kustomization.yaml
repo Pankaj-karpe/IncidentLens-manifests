@@ -1,0 +1,24 @@
+# Kustomize "table of contents": lists every file that makes up the app.
+# Overlays (dev/prod) reuse this list and only change what differs (replicas, namespace, image tag).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - configmap.yaml
+  - postgres.yaml
+  - redis.yaml
+  - migrate-job.yaml
+  - api.yaml
+  - worker.yaml
+  - frontend.yaml
+  - ingress.yaml
+
+# One place for image tags. CI will update ONLY these lines (see Part 2),
+# so no sed over many files like in project 2.
+images:
+  - name: incidentlens-backend
+    newName: pankajkarpe1/incidentlens-backend
+    newTag: v1
+  - name: incidentlens-frontend
+    newName: pankajkarpe1/incidentlens-frontend
+    newTag: v2
