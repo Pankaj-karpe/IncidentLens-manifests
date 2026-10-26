@@ -1,0 +1,34 @@
+#Automatically executes the workflow on pull requests and direct pushes to the main branch.
+# Loops through all Kustomize overlays in the repository and compiles them locally using kubectl kustomize to catch broken paths or reference errors before Argo CD encounters them.
+# Downloads Kubeconform and strictly validates every rendered manifest against official Kubernetes API schemas while safely ignoring custom resource definitions.
+
+name: Validate manifests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # If any YAML or kustomize reference is broken, fail here instead of in Argo CD.
+      - name: Render every overlay
+        run: |
+          for overlay in deploy/overlays/*/; do
+            echo "Rendering $overlay"
+            kubectl kustomize "$overlay" > "/tmp/$(basename "$overlay").yaml"
+          done
+
+      # Checks each rendered object against the Kubernetes API schema.
+      # -ignore-missing-schemas skips custom resources (ServiceMonitor, KEDA) that have no built-in schema.
+      - name: Schema check
+        run: |
+          curl -sL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          for f in /tmp/*.yaml; do ./kubeconform -strict -ignore-missing-schemas -summary "$f"; done

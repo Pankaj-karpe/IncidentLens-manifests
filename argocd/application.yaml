@@ -1,0 +1,25 @@
+#Names the Argo CD application incidentlens-dev and registers its control-plane management inside the argocd namespace.
+#Instructs Argo CD to monitor the main branch of your separate incidentlens-manifests repository, targeting the deploy/overlays/dev directory path.
+#Directs the deployment to the local Kubernetes cluster (kubernetes.default.svc) and provisions all resources into the isolated incidentlens-dev namespace.
+#Enables fully automated synchronization, resource pruning, and self-healing to ensure Git stays the absolute source of truth, while auto-creating the target namespace on the fly.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: incidentlens-dev
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Pankaj-karpe/incidentlens-manifests.git
+    targetRevision: main
+    path: deploy/overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: incidentlens-dev
+  syncPolicy:
+    automated:
+      prune: true        # remove objects deleted from git
+      selfHeal: true     # undo manual kubectl edits, so git stays the source of truth
+    syncOptions:
+      - CreateNamespace=true
