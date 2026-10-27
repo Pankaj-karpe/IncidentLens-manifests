@@ -2,15 +2,22 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: incidentlens-dev     # puts every resource in this namespace
+namespace: incidentlens-dev
 
 resources:
-  - namespace.yaml
-  - ../../base
+- namespace.yaml
+- ../../base
 
 # Dev runs lean to fit minikube's memory.
 replicas:
-  - name: incidentlens-api
-    count: 1
-  - name: incidentlens-frontend
-    count: 1
+- count: 1
+  name: incidentlens-api
+- count: 1
+  name: incidentlens-frontend
+images:
+- name: incidentlens-backend
+  newName: pankajkarpe1/incidentlens-backend
+  newTag: 609cd4c
+- name: incidentlens-frontend
+  newName: pankajkarpe1/incidentlens-frontend
+  newTag: 609cd4c
