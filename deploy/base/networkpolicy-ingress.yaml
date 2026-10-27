@@ -1,0 +1,110 @@
+# INGRESS rules = "who may connect INTO this pod".
+# Kubernetes lets every pod talk to every pod by default. First deny everything,
+# then open only the paths the app really needs.
+# Needs a network plugin that enforces NetworkPolicy (see the guide, step C0).
+
+# 1) Deny ALL incoming connections to ALL pods in this namespace.
+#    "podSelector: {}" = every pod. No "ingress:" list = nothing is allowed.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# 2) Frontend: only the ingress controller (the path your browser takes) may connect.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-from-ingress-controller
+spec:
+  podSelector:
+    matchLabels: { app: incidentlens-frontend }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: ingress-nginx }
+      ports:
+        - { protocol: TCP, port: 3000 }       # the container port, not the Service port
+---
+# 3) API: the ingress controller (login from the browser) + Alertmanager (/alerts webhook)
+#    + Prometheus (/metrics). Nothing else, not even the worker, the frontend or Postgres.
+#    Inside one "from" item, namespaceSelector + podSelector means BOTH must match (AND).
+#    Separate "from" items mean EITHER (OR).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-ingress
+spec:
+  podSelector:
+    matchLabels: { app: incidentlens-api }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: ingress-nginx }
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: monitoring }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: alertmanager }
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: monitoring }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: prometheus }
+      ports:
+        - { protocol: TCP, port: 8000 }
+---
+# 4) Worker: only Prometheus may connect (to read its /metrics on 9101).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-worker-metrics
+spec:
+  podSelector:
+    matchLabels: { app: incidentlens-worker }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: monitoring }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: prometheus }
+      ports:
+        - { protocol: TCP, port: 9101 }
+---
+# 5) Postgres: only the API, the worker and the migration job. (Your "only the API
+#    talks to Postgres" goal also needs the worker: it saves the AI results.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-postgres-from-app
+spec:
+  podSelector:
+    matchLabels: { app: postgres }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - { key: app, operator: In, values: [incidentlens-api, incidentlens-worker, incidentlens-migrate] }
+      ports:
+        - { protocol: TCP, port: 5432 }
+---
+# 6) Redis: only the API (puts jobs in) and the worker (takes jobs out).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-redis-from-app
+spec:
+  podSelector:
+    matchLabels: { app: redis }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - { key: app, operator: In, values: [incidentlens-api, incidentlens-worker] }
+      ports:
+        - { protocol: TCP, port: 6379 }

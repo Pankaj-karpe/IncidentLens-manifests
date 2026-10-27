@@ -1,0 +1,90 @@
+# EGRESS rules = "where may this pod connect OUT to".
+# Why it matters: a hacked pod can't phone home or scan the network if it has nowhere to go.
+
+# 1) Deny ALL outgoing connections from ALL pods...
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+---
+# 2) ...except DNS. Without it no pod can even look up the name "postgres".
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+---
+# 3) API: Postgres and Redis only. No internet. (Frontend, Postgres and Redis get no
+#    egress rule at all, so they can connect nowhere except DNS.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-egress
+spec:
+  podSelector:
+    matchLabels: { app: incidentlens-api }
+  policyTypes: [Egress]
+  egress:
+    - to: [{ podSelector: { matchLabels: { app: postgres } } }]
+      ports: [{ protocol: TCP, port: 5432 }]
+    - to: [{ podSelector: { matchLabels: { app: redis } } }]
+      ports: [{ protocol: TCP, port: 6379 }]
+---
+# 4) Worker: database, queue, the monitoring stack, and the internet on 443 only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-worker-egress
+spec:
+  podSelector:
+    matchLabels: { app: incidentlens-worker }
+  policyTypes: [Egress]
+  egress:
+    - to: [{ podSelector: { matchLabels: { app: postgres } } }]
+      ports: [{ protocol: TCP, port: 5432 }]
+    - to: [{ podSelector: { matchLabels: { app: redis } } }]
+      ports: [{ protocol: TCP, port: 6379 }]
+    # Prometheus 9090 and the Loki gateway pod port 8080 (its Service shows port 80,
+    # but policies look at the pod's real port).
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: monitoring }
+      ports:
+        - { protocol: TCP, port: 9090 }
+        - { protocol: TCP, port: 8080 }
+    # Gemini, GitHub and Slack are all HTTPS. Private ranges are excluded so the worker
+    # can't wander inside your network. 169.254.0.0/16 blocks the cloud metadata address
+    # (169.254.169.254), a classic way to steal cloud credentials.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16]
+      ports:
+        - { protocol: TCP, port: 443 }
+---
+# 5) Migration job: Postgres only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-migrate-egress
+spec:
+  podSelector:
+    matchLabels: { app: incidentlens-migrate }
+  policyTypes: [Egress]
+  egress:
+    - to: [{ podSelector: { matchLabels: { app: postgres } } }]
+      ports: [{ protocol: TCP, port: 5432 }]

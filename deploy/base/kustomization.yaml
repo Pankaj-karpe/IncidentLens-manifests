@@ -9,7 +9,6 @@ resources:
   - api.yaml
   - worker.yaml
   - frontend.yaml
-  - ingress.yaml
-
-# No images: block on purpose. Tags are set per overlay, so dev (changed by CI)
-# and prod (promoted by hand) never interfere with each other.
+  # - ingress.yaml
+  - networkpolicy-ingress.yaml
+  - networkpolicy-egress.yaml   # commit this one separately, after the ingress rules are verified
