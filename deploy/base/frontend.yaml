@@ -10,6 +10,7 @@ spec:
     metadata:
       labels: { app: incidentlens-frontend }
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: frontend
           image: incidentlens-frontend

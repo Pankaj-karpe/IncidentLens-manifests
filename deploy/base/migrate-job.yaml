@@ -14,7 +14,10 @@ spec:
   backoffLimit: 4                 # Postgres may still be starting; retry a few times
   ttlSecondsAfterFinished: 600
   template:
+    metadata:
+      labels: { app: incidentlens-migrate }    # NEW: lets the firewall rules recognise this pod
     spec:
+      automountServiceAccountToken: false      # NEW
       restartPolicy: OnFailure
       # Wait until Postgres answers before trying to migrate.
       initContainers:
@@ -27,8 +30,8 @@ spec:
           workingDir: /srv                  # where alembic.ini lives in the image
           command: ["alembic", "upgrade", "head"]
           envFrom:
-            - secretRef: { name: incidentlens-secrets }
             - configMapRef: { name: incidentlens-config }
+            - secretRef: { name: incidentlens-db-creds }
           securityContext:
             runAsNonRoot: true
             runAsUser: 10001

@@ -12,6 +12,7 @@ spec:
     metadata:
       labels: { app: incidentlens-worker }
     spec:
+      automountServiceAccountToken: false      # NEW
       containers:
         - name: worker
           image: incidentlens-backend
@@ -27,8 +28,9 @@ spec:
             - incidentlens
             - --concurrency=2
           envFrom:
-            - secretRef: { name: incidentlens-secrets }
             - configMapRef: { name: incidentlens-config }
+            - secretRef: { name: incidentlens-db-creds }
+            - secretRef: { name: incidentlens-worker-secrets }
           # Is the worker alive and connected to the broker? Celery can answer a "ping".
           livenessProbe:
             exec:

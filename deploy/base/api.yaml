@@ -10,6 +10,7 @@ spec:
     metadata:
       labels: { app: incidentlens-api }
     spec:
+      automountServiceAccountToken: false      # NEW: the API never talks to the Kubernetes API, so it gets no token
       containers:
         - name: api
           image: incidentlens-backend
@@ -18,8 +19,9 @@ spec:
             - name: http
               containerPort: 8000
           envFrom:
-            - secretRef: { name: incidentlens-secrets }
             - configMapRef: { name: incidentlens-config }
+            - secretRef: { name: incidentlens-db-creds }
+            - secretRef: { name: incidentlens-api-secrets }
           # Two different questions:
           #  - readiness: "can I take traffic?"  -> checks the database (/readyz)
           #  - liveness:  "is the process stuck?" -> must NOT depend on the database,
