@@ -9,6 +9,6 @@ resources:
   - api.yaml
   - worker.yaml
   - frontend.yaml
-  # - ingress.yaml
+  - ingress.yaml
   - networkpolicy-ingress.yaml
   - networkpolicy-egress.yaml   # commit this one separately, after the ingress rules are verified
