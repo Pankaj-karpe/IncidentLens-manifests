@@ -18,6 +18,10 @@ spec:
           image: incidentlens-backend
           # Linux pool (prefork) works here; "--pool=solo" was only a Windows workaround.
           # "-Q incidentlens" = the queue name set in celeryapp.py. Without it, nothing is consumed.
+          # PodMonitor finds the metrics endpoint by this port NAME.
+          ports:
+            - name: metrics
+              containerPort: 9101
           command:
             - celery
             - -A
@@ -26,7 +30,11 @@ spec:
             - --loglevel=info
             - -Q
             - incidentlens
-            - --concurrency=2
+            # threads, not forked processes: counters live in ONE process, so the
+            # /metrics server can see them. Triage is network-bound (Prometheus, Loki,
+            # LLM calls), so threads lose nothing.
+            - --pool=threads
+            - --concurrency=4
           envFrom:
             - configMapRef: { name: incidentlens-config }
             - secretRef: { name: incidentlens-db-creds }
