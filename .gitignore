@@ -1,0 +1,3 @@
+*.backup.yaml
+*.plain.yaml
+secrets/
