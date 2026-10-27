@@ -1,6 +1,4 @@
-# Two hostnames instead of path rewriting.
-# In project 2 a single Ingress with a rewrite rule broke the frontend's CSS/JS files.
-# Separate hosts avoid that whole class of bug.
+# Two hostnames instead of path rewriting (separate hosts avoid broken CSS/JS paths).
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -15,10 +13,27 @@ spec:
             pathType: Prefix
             backend:
               service: { name: incidentlens-frontend, port: { number: 80 } }
-    - host: api.incidentlens.local        # the API + the Alertmanager webhook
+    - host: api.incidentlens.local        # the API
       http:
         paths:
+          # The LONGEST matching path wins, so this beats "/" below.
+          # /alerts is for Alertmanager only, which reaches the API inside the cluster.
+          # From outside, this route goes to a Service with no pods, so nginx answers 503.
+          - path: /alerts
+            pathType: Prefix
+            backend:
+              service: { name: incidentlens-blocked, port: { number: 80 } }
           - path: /
             pathType: Prefix
             backend:
               service: { name: incidentlens-api, port: { number: 8000 } }
+---
+# A Service with NO selector has no endpoints. Anything routed here is refused.
+apiVersion: v1
+kind: Service
+metadata:
+  name: incidentlens-blocked
+spec:
+  ports:
+    - port: 80
+      targetPort: 80
