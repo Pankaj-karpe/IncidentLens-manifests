@@ -1,0 +1,19 @@
+# Part 3 locks Redis down to the API, the worker and the exporter. KEDA's operator must
+# read the queue length too, so it gets its own small opening. (Not enforced on plain
+# minikube, but this is the rule a real cluster needs.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-redis-from-keda
+spec:
+  podSelector:
+    matchLabels: { app: redis }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: keda }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: keda-operator }   # check against the labels from Step 1
+      ports:
+        - { protocol: TCP, port: 6379 }

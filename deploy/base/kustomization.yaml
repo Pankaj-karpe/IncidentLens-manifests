@@ -12,3 +12,4 @@ resources:
   - ingress.yaml
   - networkpolicy-ingress.yaml
   - networkpolicy-egress.yaml   # commit this one separately, after the ingress rules are verified
+  - pdb.yaml

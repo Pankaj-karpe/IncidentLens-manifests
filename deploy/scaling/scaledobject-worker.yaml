@@ -1,0 +1,31 @@
+# KEDA watches the Redis queue and tells Kubernetes how many workers to run.
+# It creates a normal HorizontalPodAutoscaler named keda-hpa-incidentlens-worker.
+# Formula: workers wanted = ceil(waiting jobs / listLength), kept between min and max.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: incidentlens-worker
+spec:
+  scaleTargetRef:
+    name: incidentlens-worker        # the Deployment to scale
+  minReplicaCount: 2    # never 1 and never 0: a drain can take one worker and the other keeps working,
+                        # and the first alert after a quiet night must not wait for a cold start
+  maxReplicaCount: 4    # ceiling = Gemini rate limit, DB connections (4 pods x 4 threads = 16) and cost
+  pollingInterval: 10   # look at the queue every 10 seconds
+  advanced:
+    horizontalPodAutoscalerConfig:
+    behavior: 
+      scaleDown:  # scale UP is fast; scale DOWN is slow, to avoid flapping
+        stabilizationWindowSeconds: 120   # queue must stay low for 2 min before shrinking
+        policies:
+          - { type: Pods, value: 1, periodSeconds: 60 }   # remove at most 1 worker per minute
+  triggers:
+    - type: redis
+      metadata:
+        # KEDA runs in the "keda" namespace, so the full service name is needed.
+        # In the prod overlay this namespace must be patched to incidentlens-prod.
+        address: redis.incidentlens-dev.svc.cluster.local:6379
+        listName: incidentlens     # Celery's queue is a Redis list with the queue's name
+        listLength: "5"            # target: about 5 waiting jobs per worker
+        databaseIndex: "0"
+        enableTLS: "false"

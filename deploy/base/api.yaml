@@ -6,6 +6,13 @@ spec:
   replicas: 2
   selector:
     matchLabels: { app: incidentlens-api }
+  minReadySeconds: 10          # a new pod must stay Ready 10s before it counts: catches "starts, then crashes"
+  progressDeadlineSeconds: 180 # no progress for 3 min = rollout marked FAILED (Argo shows Degraded)
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0        # never remove an old pod before a new one is Ready
+      maxSurge: 1              # start 1 extra pod at a time
   template:
     metadata:
       labels: { app: incidentlens-api }
@@ -47,6 +54,10 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp          # Python sometimes needs a writable /tmp
+          lifecycle:
+            preStop:           # runs BEFORE the shutdown signal. The ingress needs a few seconds to
+              exec:            # stop sending requests to a pod that is going away: without this pause
+                command: ["sleep", "5"]   # a few requests fail on every rollout
       volumes:
         - name: tmp
           emptyDir: {}

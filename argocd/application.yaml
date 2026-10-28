@@ -17,9 +17,16 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: incidentlens-dev
+  ignoreDifferences:                 # KEDA changes the worker's replica count; don't count that as drift
+    - group: apps
+      kind: Deployment
+      name: incidentlens-worker
+      jsonPointers: [/spec/replicas]
   syncPolicy:
     automated:
       prune: true        # remove objects deleted from git
       selfHeal: true     # undo manual kubectl edits, so git stays the source of truth
     syncOptions:
       - CreateNamespace=true
+      - RespectIgnoreDifferences=true   # make the sync itself honour the rule above
+  

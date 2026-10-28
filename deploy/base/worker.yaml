@@ -5,13 +5,21 @@ kind: Deployment
 metadata:
   name: incidentlens-worker
 spec:
-  replicas: 1                    # Part 5 will autoscale this on queue depth
+  # DELETED the "replicas:" line. KEDA now owns the replica count. If git also says 1, Argo's
+  # self-heal and KEDA would undo each other forever.
   selector:
     matchLabels: { app: incidentlens-worker }
+  minReadySeconds: 10
+  progressDeadlineSeconds: 180
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
   template:
     metadata:
       labels: { app: incidentlens-worker }
     spec:
+      terminationGracePeriodSeconds: 90   # on shutdown Celery finishes running jobs; the default 30s
+                                          # is shorter than one LLM call with retries
       automountServiceAccountToken: false      # NEW
       containers:
         - name: worker
@@ -45,6 +53,14 @@ spec:
               command: ["sh", "-c", "celery -A app.workers.celeryapp inspect ping -d celery@$HOSTNAME"]
             initialDelaySeconds: 30
             periodSeconds: 60
+            timeoutSeconds: 15
+          # ADDED a readiness probe next to the liveness probe, so a
+          # rollout waits until the new worker is really connected to Redis:
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "celery -A app.workers.celeryapp inspect ping -d celery@$HOSTNAME"]
+            initialDelaySeconds: 15
+            periodSeconds: 30
             timeoutSeconds: 15
           resources:
             requests: { cpu: 100m, memory: 192Mi }

@@ -35,6 +35,17 @@ spec:
           annotations:
             summary: "Triage queue backlog"
             description: "{{ $value }} jobs have been waiting for 5+ minutes."
+        
+        # The autoscaler already runs the most workers it may and the queue still isn't shrinking:
+        # time for a human (provider throttling? bad job loop? raise the ceiling?)
+        - alert: IncidentLensWorkersMaxedOut
+          expr: |
+            kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler="keda-hpa-incidentlens-worker"}
+              >= kube_horizontalpodautoscaler_spec_max_replicas{horizontalpodautoscaler="keda-hpa-incidentlens-worker"}
+          for: 10m
+          labels: { severity: warning, component: incidentlens }
+          annotations:
+            summary: "Worker autoscaling is at its ceiling"
 
     - name: incidentlens-ai
       rules:

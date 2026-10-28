@@ -1,0 +1,33 @@
+# PodDisruptionBudget = "during a VOLUNTARY disruption (kubectl drain, node upgrade) never take
+# more than 1 of these pods down at once". It does NOT help with crashes or a dead node.
+# maxUnavailable (not minAvailable) on purpose: it also works with 1 replica, so a single-replica
+# dev cluster can still be drained. Real protection needs >= 2 replicas (see the worker's minimum).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: 
+  name: incidentlens-api
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: incidentlens-api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: incidentlens-frontend
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: incidentlens-frontend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: incidentlens-worker 
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: incidentlens-worker 

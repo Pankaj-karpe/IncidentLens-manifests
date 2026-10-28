@@ -5,10 +5,11 @@ kind: Kustomization
 namespace: incidentlens-dev
 
 resources:
-- namespace.yaml
-- ../../base
-- sealed-secrets.yaml
-- ../../monitoring
+  - namespace.yaml
+  - ../../base
+  - sealed-secrets.yaml        # encrypted secrets for dev
+  - ../../monitoring        # NEW: Prometheus/Grafana wiring (needs the Prometheus operator)
+  - ../../scaling        # NEW: KEDA worker autoscaling
 
 # Dev runs lean to fit minikube's memory.
 replicas:
@@ -16,6 +17,7 @@ replicas:
   name: incidentlens-api
 - count: 1
   name: incidentlens-frontend
+  
 images:
 - name: incidentlens-backend
   newName: pankajkarpe1/incidentlens-backend
