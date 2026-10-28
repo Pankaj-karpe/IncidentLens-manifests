@@ -19,7 +19,7 @@ replicas:
 images:
 - name: incidentlens-backend
   newName: pankajkarpe1/incidentlens-backend
-  newTag: 92f1a46
+  newTag: 717d818
 - name: incidentlens-frontend
   newName: pankajkarpe1/incidentlens-frontend
-  newTag: 92f1a46
+  newTag: 717d818
