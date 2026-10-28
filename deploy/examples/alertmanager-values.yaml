@@ -9,6 +9,9 @@ alertmanager:
       group_interval: 1m
       repeat_interval: 4h
       routes:
+        # Put this first so IncidentLens alerts don't loop back into IncidentLens
+        - receiver: "null"                     # swap for a Slack/email receiver when you have one
+          matchers: ['component = "incidentlens"']
         - receiver: "null"
           matchers: ['alertname =~ "Watchdog|InfoInhibitor"']
     receivers:
