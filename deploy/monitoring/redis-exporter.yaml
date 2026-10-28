@@ -1,0 +1,75 @@
+# Celery's queue is a Redis list named "incidentlens". Redis cannot report its own
+# length to Prometheus, so a small helper (redis_exporter) reads it and exposes
+# it as redis_key_size{key="incidentlens"} = number of waiting jobs.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: redis-exporter }
+  template:
+    metadata:
+      labels: { app: redis-exporter }
+    spec:
+      automountServiceAccountToken: false        # same rule as Part 3: no unused API token
+      containers:
+        - name: exporter
+          # Check this tag exists on Docker Hub before committing; if not, use the latest v1.x.
+          image: oliver006/redis_exporter:v1.62.0
+          args:
+            - --redis.addr=redis://redis:6379
+            - --check-single-keys=db0=incidentlens   # export the length of the queue list
+          ports:
+            - name: metrics
+              containerPort: 9121
+          readinessProbe:
+            httpGet: { path: /metrics, port: metrics }
+          resources:
+            requests: { cpu: 20m, memory: 32Mi }
+            limits: { memory: 64Mi }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 59000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-exporter
+  labels: { app: redis-exporter }
+spec:
+  selector: { app: redis-exporter }
+  ports:
+    - name: metrics
+      port: 9121
+      targetPort: metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-exporter
+  labels:
+    release: monitoring
+spec:
+  selector:
+    matchLabels: { app: redis-exporter }
+  endpoints:
+    - port: metrics
+      interval: 30s
+
+
+#To monitor the health and backlog of your background tasks, IncidentLens deploys 
+# redis-exporter as a lightweight sidecar companion to Redis. Because Celery stores 
+# pending jobs in a live Redis list named incidentlens on port 6379, and Redis cannot
+#  natively expose queue lengths to Prometheus, the exporter uses the 
+#  oliver006/redis_exporter image to bridge the gap. By configuring it with 
+#  --redis.addr=redis://redis:6379 and --check-single-keys=db0=incidentlens, the 
+#  exporter queries database 0 to track how many tasks are piling up. It then exposes
+#   this queue size on its own internal HTTP port 9121 via a /metrics endpoint. 
+#   Finally, a ServiceMonitor labeled with release: monitoring points the cluster's 
+#   Prometheus Operator to this exporter service, allowing Prometheus to continuously
+#    ingest queue metrics every 30 seconds.

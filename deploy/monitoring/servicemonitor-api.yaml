@@ -1,0 +1,15 @@
+# "Please scrape the API's /metrics." A ServiceMonitor finds a Service by its LABELS.
+# The Service incidentlens-api already has the label app=incidentlens-api and a port named "http".
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: incidentlens-api
+  labels:
+    release: monitoring        # Prometheus only reads monitors that carry this label
+spec:
+  selector:
+    matchLabels: { app: incidentlens-api }
+  endpoints:
+    - port: http               # the Service's port NAME, not the number
+      path: /metrics
+      interval: 30s

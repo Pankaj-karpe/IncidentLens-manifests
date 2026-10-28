@@ -8,6 +8,7 @@ resources:
   - namespace.yaml
   - ../../base
   - sealed-secrets.yaml        # encrypted secrets for dev
+  - ../../monitoring        # NEW: Prometheus/Grafana wiring (needs the Prometheus operator)
 
 # Dev runs lean to fit minikube's memory.
 replicas:

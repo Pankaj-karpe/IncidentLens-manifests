@@ -1,0 +1,78 @@
+# Alert rules. Each alert has:
+#   expr  = the condition,  for = how long it must stay true (stops one-second blips),
+#   labels.component = used to route these alerts AWAY from IncidentLens itself (see Step 5).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: incidentlens
+  labels:
+    release: monitoring
+spec:
+  groups:
+    - name: incidentlens-pipeline
+      rules:
+        - alert: IncidentLensApiDown
+          expr: sum(up{namespace="incidentlens-dev", service="incidentlens-api"}) == 0
+          for: 2m
+          labels: { severity: critical, component: incidentlens }
+          annotations:
+            summary: "IncidentLens API is down"
+            description: "No API pod is being scraped. Alertmanager cannot deliver alerts."
+
+        - alert: IncidentLensWorkerDown
+          expr: sum(up{namespace="incidentlens-dev", pod=~"incidentlens-worker-.*"}) == 0
+          for: 2m
+          labels: { severity: critical, component: incidentlens }
+          annotations:
+            summary: "No IncidentLens worker is running"
+            description: "Alerts are accepted but nothing triages them."
+
+        # Queue length: jobs waiting in Redis. The earliest sign of a stuck worker or an alert storm.
+        - alert: IncidentLensQueueBacklog
+          expr: (max(redis_key_size{key="incidentlens"}) or vector(0)) > 20
+          for: 5m
+          labels: { severity: warning, component: incidentlens }
+          annotations:
+            summary: "Triage queue backlog"
+            description: "{{ $value }} jobs have been waiting for 5+ minutes."
+
+    - name: incidentlens-ai
+      rules:
+        # Share of LLM calls that did not succeed. The "and ... > 0" part avoids a false
+        # alert (0/0) when there is no traffic at all.
+        - alert: IncidentLensLLMFailureRate
+          expr: |
+            sum(rate(incidentlens_llm_calls_total{status!="ok"}[15m]))
+              / sum(rate(incidentlens_llm_calls_total[15m])) > 0.2
+            and sum(rate(incidentlens_llm_calls_total[15m])) > 0
+          for: 10m
+          labels: { severity: warning, component: incidentlens }
+          annotations:
+            summary: "More than 20% of LLM calls are failing"
+            description: "Check the API key, the quota and the provider status. Triage is degrading to raw context."
+
+        - alert: IncidentLensLLMSlow
+          expr: histogram_quantile(0.95, sum by (le) (rate(incidentlens_llm_latency_seconds_bucket[15m]))) > 30
+          for: 10m
+          labels: { severity: warning, component: incidentlens }
+          annotations:
+            summary: "LLM p95 latency above 30s"
+            description: "Triage is arriving late."
+
+        # Budget guard: change 5 (USD per 24h) to your limit.
+        - alert: IncidentLensLLMCostHigh
+          expr: sum(increase(incidentlens_llm_cost_usd_total[24h])) > 5
+          for: 5m
+          labels: { severity: warning, component: incidentlens }
+          annotations:
+            summary: "LLM spend above the daily budget"
+            description: "Spent {{ $value | humanize }} USD in 24h. Look for an alert loop."
+
+    - name: incidentlens-security
+      rules:
+        - alert: IncidentLensWebhookRejected
+          expr: sum(increase(incidentlens_auth_events_total{event="webhook_rejected"}[10m])) > 5
+          labels: { severity: warning, component: incidentlens }
+          annotations:
+            summary: "Repeated rejected webhook calls"
+            description: "Someone is calling /alerts with a wrong token, or Alertmanager has a wrong token."

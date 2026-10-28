@@ -1,0 +1,15 @@
+# The worker has no Service (nothing calls it), so we scrape the pods directly.
+# A PodMonitor finds pods by label and uses the container port NAME added in Step 2.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: incidentlens-worker
+  labels:
+    release: monitoring
+spec:
+  selector:
+    matchLabels: { app: incidentlens-worker }
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
