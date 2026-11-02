@@ -16,3 +16,13 @@ data:
   GITHUB_DEPLOY_REPO: "Pankaj-karpe/atomic-tickets-manifests"
   ALGORITHM: "HS256"
   ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+  
+   # --- LLM (primary: Gemini free tier, fallback: Ollama inside the cluster) ---
+  LLM_BASE_URL: "https://generativelanguage.googleapis.com/v1beta/openai"
+  LLM_MODEL: "gemini-2.5-flash"
+  LLM_FALLBACK_BASE_URL: "http://ollama:11434/v1"
+  LLM_FALLBACK_MODEL: "llama3.2:3b"
+  EMBEDDING_BASE_URL: "https://generativelanguage.googleapis.com/v1beta/openai"
+  EMBEDDING_MODEL: "gemini-embedding-001"
+  EMBEDDING_DIMENSIONS: "1536"      # must match the database column
+  PUBLIC_BASE_URL: "http://incidentlens.local"    # the "Open incident" link in Slack

@@ -1,0 +1,53 @@
+# The fallback LLM: runs inside the cluster, so it works when Gemini is rate limited or down.
+# The model lives on a disk, so it survives restarts and is downloaded only once.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: ollama-models }
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources: { requests: { storage: 6Gi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: ollama }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }       # a ReadWriteOnce disk can only be mounted by one pod at a time
+  selector:
+    matchLabels: { app: ollama }
+  template:
+    metadata:
+      labels: { app: ollama }
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: ollama
+          image: ollama/ollama:0.40.13
+          ports:
+            - { name: http, containerPort: 11434 }
+          env:
+            - { name: OLLAMA_MODELS, value: /models }
+            - { name: OLLAMA_KEEP_ALIVE, value: 30m }        # keep the model in memory between alerts
+            - { name: OLLAMA_CONTEXT_LENGTH, value: "8192" } # the default would silently cut our prompts
+          readinessProbe:
+            httpGet: { path: /, port: http }                 # answers "Ollama is running"
+          resources:
+            requests: { cpu: 500m, memory: 2Gi }
+            limits: { memory: 4Gi }
+          # The official image runs as root (it writes to its model folder), so no runAsNonRoot here.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: models, mountPath: /models }
+      volumes:
+        - name: models
+          persistentVolumeClaim: { claimName: ollama-models }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: ollama }
+spec:
+  selector: { app: ollama }
+  ports:
+    - { name: http, port: 11434, targetPort: http }
