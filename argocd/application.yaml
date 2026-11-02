@@ -22,11 +22,6 @@ spec:
       kind: Deployment
       name: incidentlens-worker
       jsonPointers: [/spec/replicas]
-    # Ignore KEDA-injected auto-populated fields on the ScaledObject
-    - group: keda.sh
-      kind: ScaledObject
-      name: incidentlens-worker
-      jsonPointers: [/spec/advanced/scalingModifiers]
   syncPolicy:
     automated:
       prune: true        # remove objects deleted from git

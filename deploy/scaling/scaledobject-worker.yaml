@@ -14,11 +14,11 @@ spec:
   pollingInterval: 10   # look at the queue every 10 seconds
   advanced:
     horizontalPodAutoscalerConfig:
-    behavior: 
-      scaleDown:  # scale UP is fast; scale DOWN is slow, to avoid flapping
-        stabilizationWindowSeconds: 120   # queue must stay low for 2 min before shrinking
-        policies:
-          - { type: Pods, value: 1, periodSeconds: 60 }   # remove at most 1 worker per minute
+      behavior: 
+        scaleDown:  # scale UP is fast; scale DOWN is slow, to avoid flapping
+          stabilizationWindowSeconds: 120   # queue must stay low for 2 min before shrinking
+          policies:
+            - { type: Pods, value: 1, periodSeconds: 60 }   # remove at most 1 worker per minute
   triggers:
     - type: redis
       metadata:
