@@ -11,7 +11,7 @@ resources:
   - ../../monitoring        # NEW: Prometheus/Grafana wiring (needs the Prometheus operator)
   - ../../scaling        # NEW: KEDA worker autoscaling
   - ../../ollama          # fallback LLM
-  - ./../demo
+  - ../../demo
 
 # Dev runs lean to fit minikube's memory.
 replicas:
