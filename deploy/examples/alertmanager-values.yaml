@@ -3,17 +3,14 @@ alertmanager:
     secrets: [incidentlens-webhook]        # mounted at /etc/alertmanager/secrets/incidentlens-webhook/
   config:
     route:
-      receiver: incidentlens
-      group_by: [alertname, service]
-      group_wait: 10s
-      group_interval: 1m
-      repeat_interval: 4h
+      receiver: "null"                  # default: drop everything not matched below
       routes:
-        # Put this first so IncidentLens alerts don't loop back into IncidentLens
-        - receiver: "null"                     # swap for a Slack/email receiver when you have one
-          matchers: ['component = "incidentlens"']
         - receiver: "null"
-          matchers: ['alertname =~ "Watchdog|InfoInhibitor"']
+          matchers: ['component = "incidentlens"']
+        - receiver: incidentlens
+          matchers: ['namespace = "at"']
+          group_by: [alertname, service]
+          group_wait: 10s
     receivers:
       - name: "null"
       - name: incidentlens
