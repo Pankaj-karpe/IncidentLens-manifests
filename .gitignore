@@ -1,3 +1,4 @@
 *.backup.yaml
 *.plain.yaml
 secrets/
+deploy/examples/demo-alerts.yaml
